@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-// CheckWebpageDisplay checks if a webpage displays normally by attempting HTTP/HTTPS connection
-func CheckWebpageDisplay(domain string) (bool, string, int) {
-	client := &http.Client{
+// createHTTPClient creates a configured HTTP client for webpage checks
+func createHTTPClient() *http.Client {
+	return &http.Client{
 		Timeout: 10 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			// Allow up to 10 redirects
@@ -19,17 +19,29 @@ func CheckWebpageDisplay(domain string) (bool, string, int) {
 			return nil
 		},
 	}
+}
+
+// verifyPageContent reads a small portion of the response body to verify it's readable
+func verifyPageContent(resp *http.Response) error {
+	bodyPreview := make([]byte, 100)
+	_, err := resp.Body.Read(bodyPreview)
+	if err != nil && err != io.EOF {
+		return fmt.Errorf("failed to read page content: %v", err)
+	}
+	return nil
+}
+
+// CheckWebpageDisplay checks if a webpage displays normally by attempting HTTP/HTTPS connection
+func CheckWebpageDisplay(domain string) (bool, string, int) {
+	client := createHTTPClient()
 
 	// Try HTTPS first (most common for modern websites)
 	httpsURL := fmt.Sprintf("https://%s", domain)
 	resp, err := client.Get(httpsURL)
 	if err == nil {
 		defer resp.Body.Close()
-		// Read a bit of content to verify page loads
-		bodyPreview := make([]byte, 100)
-		_, readErr := resp.Body.Read(bodyPreview)
-		if readErr != nil && readErr != io.EOF {
-			return false, fmt.Sprintf("Failed to read page content: %v", readErr), 0
+		if verifyErr := verifyPageContent(resp); verifyErr != nil {
+			return false, verifyErr.Error(), 0
 		}
 		
 		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
@@ -43,11 +55,8 @@ func CheckWebpageDisplay(domain string) (bool, string, int) {
 	resp, err = client.Get(httpURL)
 	if err == nil {
 		defer resp.Body.Close()
-		// Read a bit of content to verify page loads
-		bodyPreview := make([]byte, 100)
-		_, readErr := resp.Body.Read(bodyPreview)
-		if readErr != nil && readErr != io.EOF {
-			return false, fmt.Sprintf("Failed to read page content: %v", readErr), 0
+		if verifyErr := verifyPageContent(resp); verifyErr != nil {
+			return false, verifyErr.Error(), 0
 		}
 		
 		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
@@ -61,15 +70,7 @@ func CheckWebpageDisplay(domain string) (bool, string, int) {
 
 // CheckURLDisplay checks if a specific URL displays normally
 func CheckURLDisplay(url string) (bool, string, int) {
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return fmt.Errorf("too many redirects")
-			}
-			return nil
-		},
-	}
+	client := createHTTPClient()
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -77,11 +78,8 @@ func CheckURLDisplay(url string) (bool, string, int) {
 	}
 	defer resp.Body.Close()
 
-	// Read a bit of content to verify page loads
-	bodyPreview := make([]byte, 100)
-	_, readErr := resp.Body.Read(bodyPreview)
-	if readErr != nil && readErr != io.EOF {
-		return false, fmt.Sprintf("Failed to read page content: %v", readErr), 0
+	if verifyErr := verifyPageContent(resp); verifyErr != nil {
+		return false, verifyErr.Error(), 0
 	}
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {

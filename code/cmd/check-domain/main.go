@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"start-feishubot/utils"
 )
@@ -24,7 +25,7 @@ func main() {
 	var statusCode int
 
 	// Check if it's a full URL or just a domain
-	if len(target) > 4 && (target[:4] == "http" || target[:5] == "https") {
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
 		isOnline, message, statusCode = utils.CheckURLDisplay(target)
 	} else {
 		isOnline, message, statusCode = utils.CheckWebpageDisplay(target)
