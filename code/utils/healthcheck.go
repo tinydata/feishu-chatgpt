@@ -24,8 +24,8 @@ func createHTTPClient() *http.Client {
 // verifyPageContent reads a small portion of the response body to verify it's readable
 func verifyPageContent(resp *http.Response) error {
 	bodyPreview := make([]byte, 100)
-	_, err := resp.Body.Read(bodyPreview)
-	if err != nil && err != io.EOF {
+	_, err := io.ReadAtLeast(resp.Body, bodyPreview, 1) // Read at least 1 byte
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return fmt.Errorf("failed to read page content: %v", err)
 	}
 	return nil
